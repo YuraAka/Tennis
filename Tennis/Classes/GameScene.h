@@ -2,7 +2,13 @@
 #define __HELLOWORLD_SCENE_H__
 
 #define NOMINMAX
-#include <memory>
+#include <platform/CCPlatformConfig.h>
+#if (CC_TARGET_PLATFORM == CC_PLATFORM_IOS)
+  #include <tr1/memory>
+#else
+  #include <memory>
+#endif
+
 #include <cocos2d.h>
 #include <Box2D\Box2D.h>
 #include <Box2D\Common\b2Math.h>
