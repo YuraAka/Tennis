@@ -2,6 +2,7 @@
 #define __HELLOWORLD_SCENE_H__
 
 #define NOMINMAX
+#include <memory>
 #include <cocos2d.h>
 #include <Box2D\Box2D.h>
 #include <Box2D\Common\b2Math.h>
@@ -11,6 +12,8 @@
 class Coordinator
 {
 public:
+  typedef tr1::shared_ptr<Coordinator> Ptr;
+
   Coordinator();
 
   float ToBox2d(float cocos2dPos) const;
@@ -24,69 +27,83 @@ private:
   const float Koeff;
 };
 
+typedef tr1::shared_ptr<b2World> b2WorldPtr;
+
 struct GameContext
 {
-  cocos2d::CCLayer* Layer;
-  const Coordinator* Coords;
-  b2World* World;
+  typedef tr1::shared_ptr<GameContext> Ptr;
 
-  GameContext(cocos2d::CCLayer* myLayer, const Coordinator* myCoords, b2World* myWorld)
-    : Layer(myLayer)
-    , Coords(myCoords)
-    , World(myWorld)
-  {
-  }
+  cocos2d::CCLayer& Layer;
+  Coordinator::Ptr Coords;
+  b2WorldPtr World;
+  const cocos2d::CCSize WindowSize;
+  const b2FixtureDef BodyFixture;
+
+  GameContext(cocos2d::CCLayer& myLayer, Coordinator::Ptr myCoords, b2WorldPtr myWorld);
 };
 
 class TennisBall
 {
 public:
-  TennisBall(cocos2d::CCPoint pos, const GameContext& svc);
-  //void EnableSyncWithBox2d(bool enable);
+  TennisBall(GameContext::Ptr svc);
   void Update();
 
 private:
   cocos2d::CCSprite& Sprite;
   b2Body* Body;
-  const GameContext Context;
+  GameContext::Ptr Ctx;
 };
 
-class HelloWorld : public cocos2d::CCLayer
+class TennisPlayer
 {
 public:
-  HelloWorld();
+  TennisPlayer(bool isLeft, GameContext::Ptr svc);
+  void Move(const float dy);
+  bool IsContain(const cocos2d::CCPoint& point) const;
+
+private:
+  mutable cocos2d::CCSprite& Sprite;
+  const float UpperBound;
+  const float LowerBound;
+  b2Body* Body;
+  GameContext::Ptr Ctx;
+};
+
+class TennisGame : public cocos2d::CCLayer
+{
+public:
+  TennisGame();
 
 //-- cocos2d::CCLayer
 public:
-  virtual bool init();  
+  virtual bool init();
   virtual void draw();
 
   virtual void ccTouchesMoved(cocos2d::CCSet *pTouches, cocos2d::CCEvent *pEvent);
-  virtual void ccTouchesEnded(cocos2d::CCSet* touches, cocos2d::CCEvent* event);
 
 public:
   static cocos2d::CCScene* scene();
   void menuCloseCallback(CCObject* pSender);
-  CREATE_FUNC(HelloWorld);
+  CREATE_FUNC(TennisGame);
 
 private:
   void AddExitButton();
   void AddCaption();
   void AddBackground();
-  void AddPlayer(bool left);
-  void AddBall();
+
+  std::auto_ptr<TennisPlayer> CreatePlayer(bool left) const;
+  std::auto_ptr<TennisBall> CreateBall() const;
 
   void Tick(float delta);
 
+  GameContext::Ptr CreateContext();
 private:
-  const Coordinator Coords;
-  const cocos2d::CCSize WindowSize;
+  const GameContext::Ptr Ctx;
   GLESDebugDraw DbgDraw;
-  b2World World;
-  const GameContext Context;
 
   std::auto_ptr<TennisBall> Ball;
-  cocos2d::CCSprite* PlayerLeft;
+  std::auto_ptr<TennisPlayer> PlayerLeft;
+  std::auto_ptr<TennisPlayer> PlayerRight;
 };
 
 #endif  // __HELLOWORLD_SCENE_H__
