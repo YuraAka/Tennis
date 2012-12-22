@@ -179,7 +179,7 @@ void TennisBall::Run()
   Sprite.setPosition(StartPosition);
   Body->SetTransform(Ctx->Coords->ToBox2d(StartPosition), 0);
   Body->SetLinearVelocity(b2Vec2(0, 0));
-  Body->ApplyLinearImpulse(Ctx->Coords->ToBox2d(ccp(-4, -1)), Ctx->Coords->ToBox2d(StartPosition));
+  Body->ApplyLinearImpulse(Ctx->Coords->ToBox2d(ccp(-2, -1)), Ctx->Coords->ToBox2d(StartPosition));
 }
 
 // TennisPlayer
