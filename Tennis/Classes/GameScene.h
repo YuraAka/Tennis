@@ -48,16 +48,22 @@ struct GameContext
   GameContext(cocos2d::CCLayer& myLayer, Coordinator::Ptr myCoords, b2WorldPtr myWorld);
 };
 
+typedef tr1::function<void (const cocos2d::CCPoint&)> TennisBallCallback;
+
 class TennisBall
 {
 public:
   TennisBall(GameContext::Ptr svc);
+  void SetOutOfScreenCallback(TennisBallCallback callback);
   void Update();
+  void Run();
 
 private:
   cocos2d::CCSprite& Sprite;
   b2Body* Body;
   GameContext::Ptr Ctx;
+  TennisBallCallback OnOutOfScreenCallback;
+  cocos2d::CCPoint StartPosition;
 };
 
 class TennisPlayer
@@ -90,6 +96,7 @@ public:
 public:
   static cocos2d::CCScene* scene();
   void menuCloseCallback(CCObject* pSender);
+  void ballOutOfScreenCallback(const cocos2d::CCPoint& ballPos);
   CREATE_FUNC(TennisGame);
 
 private:
@@ -110,6 +117,9 @@ private:
   std::auto_ptr<TennisBall> Ball;
   std::auto_ptr<TennisPlayer> PlayerLeft;
   std::auto_ptr<TennisPlayer> PlayerRight;
+  cocos2d::CCLabelTTF* PlayerLeftCount;
+  cocos2d::CCLabelTTF* PlayerRightCount;
+  cocos2d::CCLabelTTF* CountColon;
 };
 
 #endif  // __HELLOWORLD_SCENE_H__

@@ -27,26 +27,20 @@ namespace
       && (targetPoint.y > srcCenter.y - srcRect.height / 2)
       && (targetPoint.y < srcCenter.y + srcRect.height / 2);
   }
-  
-  class GLDrawFlagsGuard
-  {
-  public:
-    GLDrawFlagsGuard()
-    {
-      glDisable(GL_TEXTURE_2D);
-      glDisableClientState(GL_COLOR_ARRAY);
-      glDisableClientState(GL_TEXTURE_COORD_ARRAY);
-//      glEnableClientState(GL_VERTEX_ARRAY);
-    }
 
-    ~GLDrawFlagsGuard()
-    {
-//       glDisableClientState(GL_VERTEX_ARRAY);
-      glEnableClientState(GL_TEXTURE_COORD_ARRAY);
-      glEnableClientState(GL_COLOR_ARRAY);
-      glEnable(GL_TEXTURE_2D);
-    }
-  };
+  bool IsContain(const CCSize& rect, const CCPoint& point)
+  {
+    return IsContain(rect, ccp(rect.width / 2, rect.height / 2), point);
+  }
+
+  bool IsContain(const CCSize& srcRect, const CCPoint& destCenter, const CCSize& destRect)
+  {
+    return 
+      IsContain(srcRect, ccp(destCenter.x + destRect.width / 2, destCenter.y + destRect.height / 2))
+      || IsContain(srcRect, ccp(destCenter.x - destRect.width / 2, destCenter.y + destRect.height / 2))
+      || IsContain(srcRect, ccp(destCenter.x + destRect.width / 2, destCenter.y - destRect.height / 2))
+      || IsContain(srcRect, ccp(destCenter.x - destRect.width / 2, destCenter.y - destRect.height / 2));
+  }
 
   CCSprite& CreateSprite(const std::string& picturePath)
   {
@@ -136,17 +130,18 @@ CCPoint Coordinator::ToCocos2d(const b2Vec2& pos) const
   return CCPoint(pos.x * Koeff, pos.y * Koeff);
 }
 
+// TennisBall
 TennisBall::TennisBall(GameContext::Ptr ctx)
   : Sprite(CreateSprite("Ball.png"))
   , Body(NULL)
   , Ctx(ctx)
+  , StartPosition(ccp(Ctx->WindowSize.width / 2, Ctx->WindowSize.height / 2))
 {
-  CCPoint pos(ccp(Ctx->WindowSize.width / 2, Ctx->WindowSize.height / 2));
-  Sprite.setPosition(pos);
+  Sprite.setPosition(StartPosition);
   Ctx->Layer.addChild(&Sprite, 1);
 
   b2BodyDef bodyDef;
-  bodyDef.position = Ctx->Coords->ToBox2d(pos);
+  bodyDef.position = Ctx->Coords->ToBox2d(StartPosition);
   bodyDef.type = b2_dynamicBody;
   bodyDef.fixedRotation = true;
   Body = Ctx->World->CreateBody(&bodyDef);
@@ -157,13 +152,34 @@ TennisBall::TennisBall(GameContext::Ptr ctx)
   fixDef.shape = &shape;
   fixDef.density = Ctx->Coords->ToBox2d(100);
   Body->CreateFixture(&fixDef);
-  Body->ApplyLinearImpulse(Ctx->Coords->ToBox2d(ccp(-4, -1)), Ctx->Coords->ToBox2d(pos));
 }
 
-// TennisBall
+void TennisBall::SetOutOfScreenCallback(TennisBallCallback callback)
+{
+  OnOutOfScreenCallback = callback;
+}
+
 void TennisBall::Update()
 {
-  Sprite.setPosition(Ctx->Coords->ToCocos2d(Body->GetPosition()));
+  if (!IsContain(Ctx->WindowSize, Sprite.getPosition(), Sprite.getContentSize()))
+  {
+    return;
+  }
+
+  CCPoint pos = Ctx->Coords->ToCocos2d(Body->GetPosition());
+  Sprite.setPosition(pos);
+  if (OnOutOfScreenCallback && !IsContain(Ctx->WindowSize, pos, Sprite.getContentSize()))
+  {
+    OnOutOfScreenCallback(pos);
+  }
+}
+
+void TennisBall::Run()
+{
+  Sprite.setPosition(StartPosition);
+  Body->SetTransform(Ctx->Coords->ToBox2d(StartPosition), 0);
+  Body->SetLinearVelocity(b2Vec2(0, 0));
+  Body->ApplyLinearImpulse(Ctx->Coords->ToBox2d(ccp(-4, -1)), Ctx->Coords->ToBox2d(StartPosition));
 }
 
 // TennisPlayer
@@ -272,15 +288,15 @@ bool TennisGame::init()
   {
     THROW_UNLESS(CCLayer::init());
     setTouchEnabled(true);
-
     AddExitButton();
-    //AddCaption();
+    AddCaption();
     PlayerLeft = CreatePlayer(true);
     PlayerRight = CreatePlayer(false);
     Ball = CreateBall();
+    Ball->SetOutOfScreenCallback(tr1::bind(&TennisGame::ballOutOfScreenCallback, this, tr1::placeholders::_1));
     CreateEarth(*Ctx);
-    //AddBackground();
     schedule(schedule_selector(TennisGame::Tick));
+    Ball->Run();
     return true;
   }
   catch (const std::logic_error& err)
@@ -342,10 +358,15 @@ void TennisGame::AddExitButton()
 
 void TennisGame::AddCaption()
 {
-//   CCLabelTTF* pLabel = CCLabelTTF::create("Welcome to Yura's first tennis", "Consolas", 24);
-//   THROW_UNLESS(pLabel);
-//   pLabel->setPosition(ccp(WindowSize.width / 2, WindowSize.height - 10));
-//   this->addChild(pLabel, 1);
+   PlayerLeftCount = CCLabelTTF::create("0", "Consolas", 24);
+   PlayerRightCount = CCLabelTTF::create("0", "Consolas", 24);
+   CountColon = CCLabelTTF::create(":", "Consolas", 24);
+   PlayerLeftCount->setPosition(ccp(Ctx->WindowSize.width / 2 - 20, Ctx->WindowSize.height - 10));
+   PlayerRightCount->setPosition(ccp(Ctx->WindowSize.width / 2 + 20, Ctx->WindowSize.height - 10));
+   CountColon->setPosition(ccp(Ctx->WindowSize.width / 2, Ctx->WindowSize.height - 10));
+   this->addChild(PlayerLeftCount, 1);
+   this->addChild(PlayerRightCount, 1);
+   this->addChild(CountColon, 1);
 }
 
 void TennisGame::AddBackground()
@@ -373,4 +394,13 @@ void TennisGame::menuCloseCallback(CCObject* pSender)
 #if (CC_TARGET_PLATFORM == CC_PLATFORM_IOS)
   exit(0);
 #endif
+}
+
+void TennisGame::ballOutOfScreenCallback(const cocos2d::CCPoint& ballPos)
+{
+  bool isLeftWin = (ballPos.x > 0);
+  CCLabelTTF& count = isLeftWin ? *PlayerLeftCount : *PlayerRightCount;
+  std::string countBuf(10, 0);
+  count.setString(itoa(atoi(count.getString()) + 1, &countBuf[0], 10));
+  Ball->Run();
 }
